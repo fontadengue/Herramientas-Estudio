@@ -19,7 +19,9 @@ import {
   FolderPlusIcon,
   FilePlusIcon,
   MenuIcon,
-  HomeIcon
+  HomeIcon,
+  DownloadIcon,
+  FileTextIcon
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -52,21 +54,22 @@ interface Folder {
   userId: string;
 }
 
-interface HtmlFile {
+interface DocumentFile {
   id: string;
   name: string;
   content: string;
   folderId: string;
   userId: string;
   createdAt: string;
+  type: 'html' | 'txt';
 }
 
 // --- Components ---
 
 export default function App() {
   const [folders, setFolders] = useState<Folder[]>([]);
-  const [files, setFiles] = useState<HtmlFile[]>([]);
-  const [selectedFile, setSelectedFile] = useState<HtmlFile | null>(null);
+  const [files, setFiles] = useState<DocumentFile[]>([]);
+  const [selectedFile, setSelectedFile] = useState<DocumentFile | null>(null);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [lastKeyPressed, setLastKeyPressed] = useState<string | null>(null);
   const [lastKeyTime, setLastKeyTime] = useState<number>(0);
@@ -74,6 +77,7 @@ export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isEditMode, setIsEditMode] = useState(false);
 
   // --- Data Fetching ---
 
@@ -95,7 +99,7 @@ export default function App() {
     });
 
     const unsubscribeFiles = onSnapshot(filesQuery, (snapshot) => {
-      const fileData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as HtmlFile));
+      const fileData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as DocumentFile));
       setFiles(fileData);
     });
 
@@ -109,13 +113,22 @@ export default function App() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      const now = Date.now();
+      
       if (e.key === '*') {
-        const now = Date.now();
         if (lastKeyPressed === '*' && now - lastKeyTime < 500) {
           setIsUploadModalOpen(true);
           setLastKeyPressed(null);
         } else {
           setLastKeyPressed('*');
+          setLastKeyTime(now);
+        }
+      } else if (e.key === '/') {
+        if (lastKeyPressed === '/' && now - lastKeyTime < 500) {
+          setIsEditMode(!isEditMode);
+          setLastKeyPressed(null);
+        } else {
+          setLastKeyPressed('/');
           setLastKeyTime(now);
         }
       } else {
@@ -221,6 +234,7 @@ export default function App() {
                     setSelectedFile(file);
                     setIsSidebarOpen(false);
                   }}
+                  isEditMode={isEditMode}
                 />
               ))}
             </motion.div>
@@ -234,16 +248,43 @@ export default function App() {
           <div className="flex-1 flex flex-col w-full h-full">
             <header className="h-14 border-b border-white/10 flex items-center justify-between px-6 pl-20 bg-[#0f0f0f]">
               <div className="flex items-center gap-2">
-                <FileCodeIcon size={18} className="text-blue-400" />
+                {selectedFile.type === 'txt' ? (
+                  <FileTextIcon size={18} className="text-blue-400" />
+                ) : (
+                  <FileCodeIcon size={18} className="text-blue-400" />
+                )}
                 <span className="font-medium text-sm truncate max-w-[200px] md:max-w-md">{selectedFile.name}</span>
               </div>
+              <button 
+                onClick={() => {
+                  const blob = new Blob([selectedFile.content], { type: selectedFile.type === 'txt' ? 'text/plain' : 'text/html' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = selectedFile.name;
+                  document.body.appendChild(a);
+                  a.click();
+                  document.body.removeChild(a);
+                  URL.revokeObjectURL(url);
+                }}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 transition-all text-xs font-medium"
+              >
+                <DownloadIcon size={14} />
+                <span>Descargar</span>
+              </button>
             </header>
-            <div className="flex-1 bg-white">
-              <iframe 
-                srcDoc={selectedFile.content}
-                className="w-full h-full border-none"
-                title={selectedFile.name}
-              />
+            <div className="flex-1 bg-white overflow-hidden">
+              {selectedFile.type === 'txt' ? (
+                <div className="w-full h-full p-8 overflow-auto bg-[#f8f9fa] text-gray-800 font-mono text-sm leading-relaxed whitespace-pre-wrap">
+                  {selectedFile.content}
+                </div>
+              ) : (
+                <iframe 
+                  srcDoc={selectedFile.content}
+                  className="w-full h-full border-none"
+                  title={selectedFile.name}
+                />
+              )}
             </div>
           </div>
         ) : (
@@ -318,7 +359,11 @@ export default function App() {
                               className="w-full flex items-center gap-3 p-3 rounded-xl bg-white/5 border border-white/5 hover:bg-blue-600/20 hover:border-blue-500/30 transition-all group text-left"
                             >
                               <div className="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center text-blue-400 group-hover:bg-blue-500 group-hover:text-white transition-colors">
-                                <FileCodeIcon size={16} />
+                                {file.type === 'txt' ? (
+                                  <FileTextIcon size={16} />
+                                ) : (
+                                  <FileCodeIcon size={16} />
+                                )}
                               </div>
                               <div className="flex-1 min-w-0">
                                 <p className="text-sm font-medium truncate">{file.name}</p>
@@ -370,25 +415,62 @@ function SidebarPanel({
   navigationPath, 
   setNavigationPath,
   selectedFile,
-  setSelectedFile
+  setSelectedFile,
+  isEditMode
 }: { 
   folderId: string, 
   folders: Folder[], 
-  files: HtmlFile[], 
+  files: DocumentFile[], 
   index: number,
   navigationPath: string[],
   setNavigationPath: (path: string[]) => void,
-  selectedFile: HtmlFile | null,
-  setSelectedFile: (file: HtmlFile) => void
+  selectedFile: DocumentFile | null,
+  setSelectedFile: (file: DocumentFile) => void,
+  isEditMode: boolean
 }) {
   const currentFolders = folders.filter(f => f.parentId === folderId);
   const currentFiles = files.filter(f => f.folderId === folderId);
   const activeChildId = navigationPath[index + 1];
 
   const handleFolderClick = (id: string) => {
+    if (isEditMode) return;
     const newPath = navigationPath.slice(0, index + 1);
     newPath.push(id);
     setNavigationPath(newPath);
+  };
+
+  const handleDeleteFile = async (e: React.MouseEvent, fileId: string) => {
+    e.stopPropagation();
+    if (confirm('¿Estás seguro de que quieres eliminar este archivo?')) {
+      try {
+        await deleteDoc(doc(db, 'htmlFiles', fileId));
+        if (selectedFile?.id === fileId) setSelectedFile(null);
+      } catch (error) {
+        console.error("Delete File Error:", error);
+      }
+    }
+  };
+
+  const handleDeleteFolder = async (e: React.MouseEvent, folder: Folder) => {
+    e.stopPropagation();
+    const hasContents = folders.some(f => f.parentId === folder.id) || files.some(f => f.folderId === folder.id);
+    
+    if (hasContents) {
+      alert('No se puede eliminar una carpeta que contiene archivos o subcarpetas. Elimina primero su contenido.');
+      return;
+    }
+
+    if (confirm(`¿Estás seguro de que quieres eliminar la carpeta "${folder.name}"?`)) {
+      try {
+        await deleteDoc(doc(db, 'folders', folder.id));
+        // Reset navigation path if deleted folder was active
+        if (navigationPath.includes(folder.id)) {
+          setNavigationPath(navigationPath.slice(0, index + 1));
+        }
+      } catch (error) {
+        console.error("Delete Folder Error:", error);
+      }
+    }
   };
 
   return (
@@ -397,11 +479,16 @@ function SidebarPanel({
       animate={{ width: 240, opacity: 1 }}
       className="flex-shrink-0 w-60 border-r border-white/10 flex flex-col bg-[#0f0f0f]"
     >
-      <div className="p-4 border-b border-white/10 bg-[#141414]/50">
+      <div className="p-4 border-b border-white/10 bg-[#141414]/50 flex items-center justify-between">
         <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-gray-500">
           {index === 0 ? <SearchIcon size={12} /> : <FolderIcon size={12} />}
           <span>{index === 0 ? 'Biblioteca' : folders.find(f => f.id === folderId)?.name}</span>
         </div>
+        {isEditMode && (
+          <div className="px-1.5 py-0.5 rounded bg-red-500/20 text-red-500 text-[8px] font-bold uppercase tracking-tighter border border-red-500/30">
+            Editando
+          </div>
+        )}
       </div>
       <div className="flex-1 overflow-y-auto p-2 space-y-1">
         {currentFolders.length === 0 && currentFiles.length === 0 && (
@@ -418,31 +505,61 @@ function SidebarPanel({
               "w-full flex items-center justify-between py-2 px-3 rounded-xl transition-all text-sm group",
               activeChildId === folder.id 
                 ? "bg-yellow-500/20 text-yellow-400 border border-yellow-500/30" 
-                : "text-gray-300 hover:bg-white/5 border border-transparent"
+                : "text-gray-300 hover:bg-white/5 border border-transparent",
+              isEditMode && "cursor-default"
             )}
           >
             <div className="flex items-center gap-3 truncate">
               <FolderIcon size={16} className={cn(activeChildId === folder.id ? "text-yellow-400" : "text-yellow-500/70")} />
               <span className="truncate">{folder.name}</span>
             </div>
-            <ChevronRightIcon size={14} className={cn("flex-shrink-0", activeChildId === folder.id ? "opacity-100" : "opacity-40")} />
+            <div className="flex items-center gap-1">
+              {isEditMode ? (
+                <button 
+                  onClick={(e) => handleDeleteFolder(e, folder)}
+                  className="p-1.5 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white transition-all"
+                >
+                  <Trash2Icon size={12} />
+                </button>
+              ) : (
+                <ChevronRightIcon size={14} className={cn("flex-shrink-0", activeChildId === folder.id ? "opacity-100" : "opacity-40")} />
+              )}
+            </div>
           </button>
         ))}
 
         {currentFiles.map(file => (
-          <button 
+          <div 
             key={file.id}
-            onClick={() => setSelectedFile(file)}
-            className={cn(
-              "w-full flex items-center gap-3 py-2 px-3 rounded-xl transition-all text-sm group border",
-              selectedFile?.id === file.id 
-                ? "bg-blue-600 text-white border-blue-500 shadow-lg shadow-blue-600/20" 
-                : "bg-blue-500/10 text-blue-100 border-blue-500/20 hover:bg-blue-500/20"
-            )}
+            className="group relative"
           >
-            <FileCodeIcon size={16} className={cn(selectedFile?.id === file.id ? "text-white" : "text-blue-400")} />
-            <span className="truncate font-semibold">{file.name}</span>
-          </button>
+            <button 
+              onClick={() => !isEditMode && setSelectedFile(file)}
+              className={cn(
+                "w-full flex items-center gap-3 py-2 px-3 rounded-xl transition-all text-sm group border",
+                selectedFile?.id === file.id 
+                  ? "bg-blue-600 text-white border-blue-500 shadow-lg shadow-blue-600/20" 
+                  : "bg-blue-500/10 text-blue-100 border-blue-500/20 hover:bg-blue-500/20",
+                isEditMode && "cursor-default pr-10"
+              )}
+            >
+              {file.type === 'txt' ? (
+                <FileTextIcon size={16} className={cn(selectedFile?.id === file.id ? "text-white" : "text-blue-400")} />
+              ) : (
+                <FileCodeIcon size={16} className={cn(selectedFile?.id === file.id ? "text-white" : "text-blue-400")} />
+              )}
+              <span className="truncate font-semibold">{file.name}</span>
+            </button>
+            
+            {isEditMode && (
+              <button 
+                onClick={(e) => handleDeleteFile(e, file.id)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white transition-all z-10"
+              >
+                <Trash2Icon size={12} />
+              </button>
+            )}
+          </div>
         ))}
       </div>
     </motion.div>
@@ -453,7 +570,7 @@ function SidebarPanel({
 
 function UploadModal({ onClose, folders }: { onClose: () => void, folders: Folder[] }) {
   const [step, setStep] = useState<'upload' | 'classify'>('upload');
-  const [file, setFile] = useState<{ name: string, content: string } | null>(null);
+  const [file, setFile] = useState<{ name: string, content: string, type: 'html' | 'txt' } | null>(null);
   const [path, setPath] = useState<string>(''); // e.g. "Bancos/Macro"
   const [isUploading, setIsUploading] = useState(false);
 
@@ -461,11 +578,14 @@ function UploadModal({ onClose, folders }: { onClose: () => void, folders: Folde
     const selectedFile = e.target.files?.[0];
     if (!selectedFile) return;
 
+    const fileType = selectedFile.name.endsWith('.txt') ? 'txt' : 'html';
+
     const reader = new FileReader();
     reader.onload = (event) => {
       setFile({
         name: selectedFile.name,
-        content: event.target?.result as string
+        content: event.target?.result as string,
+        type: fileType
       });
       setStep('classify');
     };
@@ -502,6 +622,7 @@ function UploadModal({ onClose, folders }: { onClose: () => void, folders: Folde
       await addDoc(collection(db, 'htmlFiles'), {
         name: file.name,
         content: file.content,
+        type: file.type,
         folderId: currentParentId,
         userId: 'public',
         createdAt: new Date().toISOString()
@@ -531,7 +652,7 @@ function UploadModal({ onClose, folders }: { onClose: () => void, folders: Folde
         onClick={e => e.stopPropagation()}
       >
         <div className="p-6 border-b border-white/10 flex items-center justify-between">
-          <h2 className="text-xl font-semibold">Cargar Archivo HTML</h2>
+          <h2 className="text-xl font-semibold">Cargar Archivo</h2>
           <button onClick={onClose} className="p-1 hover:bg-white/5 rounded-full">
             <XIcon size={20} />
           </button>
@@ -546,9 +667,9 @@ function UploadModal({ onClose, folders }: { onClose: () => void, folders: Folde
                   <p className="mb-2 text-sm text-gray-400">
                     <span className="font-semibold">Haz clic para subir</span> o arrastra y suelta
                   </p>
-                  <p className="text-xs text-gray-500">Solo archivos .html</p>
+                  <p className="text-xs text-gray-500">Archivos .html o .txt</p>
                 </div>
-                <input type="file" className="hidden" accept=".html" onChange={handleFileChange} />
+                <input type="file" className="hidden" accept=".html,.txt" onChange={handleFileChange} />
               </label>
             </div>
           ) : (
@@ -556,7 +677,11 @@ function UploadModal({ onClose, folders }: { onClose: () => void, folders: Folde
               <div className="space-y-2">
                 <label className="text-sm font-medium text-gray-400">Archivo seleccionado</label>
                 <div className="flex items-center gap-3 p-3 bg-white/5 rounded-xl border border-white/5">
-                  <FileCodeIcon size={20} className="text-blue-400" />
+                  {file?.type === 'txt' ? (
+                    <FileTextIcon size={20} className="text-blue-400" />
+                  ) : (
+                    <FileCodeIcon size={20} className="text-blue-400" />
+                  )}
                   <span className="text-sm truncate">{file?.name}</span>
                 </div>
               </div>
