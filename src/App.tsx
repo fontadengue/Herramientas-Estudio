@@ -22,8 +22,10 @@ import {
   HomeIcon,
   DownloadIcon,
   FileTextIcon,
-  ExternalLinkIcon
+  ExternalLinkIcon,
+  TableIcon
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   collection, 
@@ -85,7 +87,7 @@ interface DocumentFile {
   folderId: string;
   userId: string;
   createdAt: string;
-  type: 'html' | 'txt';
+  type: 'html' | 'txt' | 'xlsx';
 }
 
 interface SidebarPanelProps {
@@ -295,7 +297,22 @@ export default function App() {
               </div>
               <button 
                 onClick={() => {
-                  const blob = new Blob([selectedFile.content], { type: selectedFile.type === 'txt' ? 'text/plain' : 'text/html' });
+                  const isBase64 = selectedFile.content.startsWith('data:');
+                  let blob: Blob;
+                  
+                  if (isBase64) {
+                    const byteString = atob(selectedFile.content.split(',')[1]);
+                    const mimeString = selectedFile.content.split(',')[0].split(':')[1].split(';')[0];
+                    const ab = new ArrayBuffer(byteString.length);
+                    const ia = new Uint8Array(ab);
+                    for (let i = 0; i < byteString.length; i++) {
+                      ia[i] = byteString.charCodeAt(i);
+                    }
+                    blob = new Blob([ab], { type: mimeString });
+                  } else {
+                    blob = new Blob([selectedFile.content], { type: selectedFile.type === 'txt' ? 'text/plain' : 'text/html' });
+                  }
+
                   const url = URL.createObjectURL(blob);
                   const a = document.createElement('a');
                   a.href = url;
@@ -342,6 +359,8 @@ export default function App() {
                     </div>
                   </motion.div>
                 </div>
+              ) : selectedFile.type === 'xlsx' ? (
+                <ExcelPreview content={selectedFile.content} />
               ) : selectedFile.type === 'txt' ? (
                 <div className="w-full h-full p-8 overflow-auto bg-[#f8f9fa] text-gray-800 font-mono text-sm leading-relaxed whitespace-pre-wrap">
                   {selectedFile.content}
@@ -469,6 +488,69 @@ export default function App() {
           />
         )}
       </AnimatePresence>
+    </div>
+  );
+}
+
+// --- Excel Preview Component ---
+
+function ExcelPreview({ content }: { content: string }) {
+  const [data, setData] = useState<any[][]>([]);
+  const [sheets, setSheets] = useState<string[]>([]);
+  const [activeSheet, setActiveSheet] = useState(0);
+
+  useEffect(() => {
+    try {
+      const base64 = content.split(',')[1];
+      const workbook = XLSX.read(base64, { type: 'base64' });
+      setSheets(workbook.SheetNames);
+      
+      const firstSheetName = workbook.SheetNames[activeSheet];
+      const worksheet = workbook.Sheets[firstSheetName];
+      const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[][];
+      setData(jsonData);
+    } catch (error) {
+      console.error("Excel Preview Error:", error);
+    }
+  }, [content, activeSheet]);
+
+  if (data.length === 0) return (
+    <div className="w-full h-full flex items-center justify-center text-gray-400">
+      Cargando vista previa...
+    </div>
+  );
+
+  return (
+    <div className="w-full h-full flex flex-col bg-white">
+      <div className="flex border-b border-gray-200 bg-gray-50 overflow-x-auto">
+        {sheets.map((name, idx) => (
+          <button
+            key={name}
+            onClick={() => setActiveSheet(idx)}
+            className={cn(
+              "px-4 py-2 text-xs font-medium border-r border-gray-200 transition-colors whitespace-nowrap",
+              activeSheet === idx ? "bg-white text-blue-600 border-b-2 border-b-blue-600" : "text-gray-500 hover:bg-gray-100"
+            )}
+          >
+            {name}
+          </button>
+        ))}
+      </div>
+      <div className="flex-1 overflow-auto p-4">
+        <table className="min-w-full border-collapse text-xs text-gray-700">
+          <tbody>
+            {data.map((row, rIdx) => (
+              <tr key={rIdx} className="border-b border-gray-100 hover:bg-gray-50">
+                {row.map((cell, cIdx) => (
+                  <td key={cIdx} className="border border-gray-200 p-2 min-w-[100px]">
+                    {cell?.toString() || ''}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -696,7 +778,7 @@ const SidebarPanel: React.FC<SidebarPanelProps> = ({
 
 function UploadModal({ onClose, folders }: { onClose: () => void, folders: Folder[] }) {
   const [step, setStep] = useState<'upload' | 'classify'>('upload');
-  const [file, setFile] = useState<{ name: string, content: string, type: 'html' | 'txt' } | null>(null);
+  const [file, setFile] = useState<{ name: string, content: string, type: 'html' | 'txt' | 'xlsx' } | null>(null);
   const [path, setPath] = useState<string>(''); // e.g. "Bancos/Macro"
   const [isUploading, setIsUploading] = useState(false);
 
@@ -704,7 +786,9 @@ function UploadModal({ onClose, folders }: { onClose: () => void, folders: Folde
     const selectedFile = e.target.files?.[0];
     if (!selectedFile) return;
 
-    const fileType = selectedFile.name.endsWith('.txt') ? 'txt' : 'html';
+    const isExcel = selectedFile.name.endsWith('.xlsx') || selectedFile.name.endsWith('.xls');
+    const isTxt = selectedFile.name.endsWith('.txt');
+    const fileType = isExcel ? 'xlsx' : (isTxt ? 'txt' : 'html');
 
     const reader = new FileReader();
     reader.onload = (event) => {
@@ -715,7 +799,12 @@ function UploadModal({ onClose, folders }: { onClose: () => void, folders: Folde
       });
       setStep('classify');
     };
-    reader.readAsText(selectedFile);
+
+    if (isExcel) {
+      reader.readAsDataURL(selectedFile);
+    } else {
+      reader.readAsText(selectedFile);
+    }
   };
 
   const handleUpload = async () => {
@@ -793,9 +882,9 @@ function UploadModal({ onClose, folders }: { onClose: () => void, folders: Folde
                   <p className="mb-2 text-sm text-gray-400">
                     <span className="font-semibold">Haz clic para subir</span> o arrastra y suelta
                   </p>
-                  <p className="text-xs text-gray-500">Archivos .html, .txt o .url</p>
+                  <p className="text-xs text-gray-500">Archivos .html, .txt, .url o .xlsx</p>
                 </div>
-                <input type="file" className="hidden" accept=".html,.txt,.url" onChange={handleFileChange} />
+                <input type="file" className="hidden" accept=".html,.txt,.url,.xlsx,.xls" onChange={handleFileChange} />
               </label>
             </div>
           ) : (
@@ -805,6 +894,8 @@ function UploadModal({ onClose, folders }: { onClose: () => void, folders: Folde
                 <div className="flex items-center gap-3 p-3 bg-white/5 rounded-xl border border-white/5">
                   {file?.type === 'txt' ? (
                     <FileTextIcon size={20} className="text-blue-400" />
+                  ) : file?.type === 'xlsx' ? (
+                    <TableIcon size={20} className="text-green-400" />
                   ) : (
                     <FileCodeIcon size={20} className="text-blue-400" />
                   )}
