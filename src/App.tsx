@@ -72,6 +72,7 @@ export default function App() {
   const [navigationPath, setNavigationPath] = useState<string[]>(['root']);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // --- Data Fetching ---
 
@@ -230,36 +231,100 @@ export default function App() {
             </div>
           </div>
         ) : (
-          <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
+          <div className="flex-1 flex flex-col items-center justify-center text-center p-8 overflow-y-auto">
             <motion.div 
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="max-w-sm flex flex-col items-center gap-8"
+              className="max-w-2xl w-full flex flex-col items-center gap-8 py-12"
             >
-              <div className="w-64 h-64 rounded-full overflow-hidden border-4 border-white/10 shadow-[0_0_50px_rgba(255,255,255,0.05)] bg-[#111] flex items-center justify-center relative group">
-                <img 
-                  src="https://www.estudiodutto.com.ar/img/logoestudio.png" 
-                  alt="Estudio Dutto Logo" 
-                  className="w-full h-full object-cover"
-                  referrerPolicy="no-referrer"
-                  onError={(e) => {
-                    e.currentTarget.style.display = 'none';
-                    const fallback = e.currentTarget.parentElement?.querySelector('.fallback-logo');
-                    if (fallback) (fallback as HTMLElement).style.display = 'flex';
-                  }}
-                />
-                <div className="fallback-logo hidden absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-blue-600 to-indigo-900">
-                  <span className="text-7xl font-black tracking-tighter text-white">ED</span>
-                  <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-white/60 mt-2">Estudio Dutto</span>
+              {/* Logo and Title */}
+              <div className="flex flex-col items-center gap-6">
+                <div className="w-48 h-48 rounded-full overflow-hidden border-4 border-white/10 shadow-[0_0_50px_rgba(255,255,255,0.05)] bg-[#111] flex items-center justify-center relative group">
+                  <img 
+                    src="https://www.estudiodutto.com.ar/img/logoestudio.png" 
+                    alt="Estudio Dutto Logo" 
+                    className="w-full h-full object-cover"
+                    referrerPolicy="no-referrer"
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none';
+                      const fallback = e.currentTarget.parentElement?.querySelector('.fallback-logo');
+                      if (fallback) (fallback as HTMLElement).style.display = 'flex';
+                    }}
+                  />
+                  <div className="fallback-logo hidden absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-blue-600 to-indigo-900">
+                    <span className="text-6xl font-black tracking-tighter text-white">ED</span>
+                    <span className="text-[8px] font-bold uppercase tracking-[0.3em] text-white/60 mt-2">Estudio Dutto</span>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <h1 className="text-5xl font-bold tracking-tighter bg-gradient-to-b from-white to-white/40 bg-clip-text text-transparent">
+                    Estudio Dutto
+                  </h1>
+                  <p className="text-gray-500 text-sm font-medium">
+                    Gestión y Visualización de Documentos
+                  </p>
                 </div>
               </div>
-              <div className="space-y-3">
-                <h1 className="text-5xl font-bold tracking-tighter bg-gradient-to-b from-white to-white/40 bg-clip-text text-transparent">
-                  Estudio Dutto
-                </h1>
-                <p className="text-gray-500 text-sm font-medium">
-                  Selecciona un archivo desde el menú lateral para comenzar a visualizar tus documentos.
-                </p>
+
+              {/* Search Bar */}
+              <div className="w-full max-w-md relative group">
+                <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none text-gray-400 group-focus-within:text-blue-400 transition-colors">
+                  <SearchIcon size={18} />
+                </div>
+                <input 
+                  type="text"
+                  placeholder="Buscar documentos por nombre..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pl-12 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all backdrop-blur-sm"
+                />
+              </div>
+
+              {/* Search Results or Welcome Message */}
+              <div className="w-full max-w-md">
+                {searchQuery.trim() ? (
+                  <div className="space-y-2 text-left">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-4 px-2">
+                      Resultados de búsqueda
+                    </p>
+                    <div className="grid gap-2">
+                      {files.filter(f => f.name.toLowerCase().includes(searchQuery.toLowerCase())).length > 0 ? (
+                        files
+                          .filter(f => f.name.toLowerCase().includes(searchQuery.toLowerCase()))
+                          .slice(0, 5)
+                          .map(file => (
+                            <button
+                              key={file.id}
+                              onClick={() => {
+                                setSelectedFile(file);
+                                setSearchQuery('');
+                              }}
+                              className="w-full flex items-center gap-3 p-3 rounded-xl bg-white/5 border border-white/5 hover:bg-blue-600/20 hover:border-blue-500/30 transition-all group text-left"
+                            >
+                              <div className="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center text-blue-400 group-hover:bg-blue-500 group-hover:text-white transition-colors">
+                                <FileCodeIcon size={16} />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium truncate">{file.name}</p>
+                                <p className="text-[10px] text-gray-500 truncate">
+                                  {folders.find(f => f.id === file.folderId)?.name || 'Raíz'}
+                                </p>
+                              </div>
+                              <ChevronRightIcon size={14} className="text-gray-600 group-hover:text-blue-400 transition-colors" />
+                            </button>
+                          ))
+                      ) : (
+                        <div className="py-8 text-center bg-white/5 rounded-2xl border border-dashed border-white/10">
+                          <p className="text-sm text-gray-500">No se encontraron documentos con ese nombre.</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-gray-500 text-sm font-medium">
+                    Selecciona un archivo desde el menú lateral o usa el buscador para comenzar.
+                  </p>
+                )}
               </div>
             </motion.div>
           </div>
