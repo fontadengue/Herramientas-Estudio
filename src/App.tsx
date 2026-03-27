@@ -18,7 +18,8 @@ import {
   Trash2Icon,
   FolderPlusIcon,
   FilePlusIcon,
-  MenuIcon
+  MenuIcon,
+  HomeIcon
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -173,6 +174,21 @@ export default function App() {
           )}
         </AnimatePresence>
       </div>
+
+      {/* Home Button (Top Right) */}
+      <motion.button 
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.95 }}
+        onClick={() => {
+          setSelectedFile(null);
+          setSearchQuery('');
+          setNavigationPath(['root']);
+        }}
+        className="fixed top-4 right-4 z-50 flex items-center justify-center w-11 h-11 rounded-full bg-white/10 backdrop-blur-md border border-white/10 hover:bg-white/20 transition-all shadow-xl text-white"
+        title="Ir al Inicio"
+      >
+        <HomeIcon size={20} />
+      </motion.button>
 
       {/* Sidebar Panels (Overlay) */}
       <AnimatePresence>
