@@ -1,0 +1,38 @@
+{
+  "entities": {
+    "Folder": {
+      "title": "Folder",
+      "description": "A folder in the sidebar menu",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "The name of the folder" },
+        "parentId": { "type": "string", "description": "The ID of the parent folder or 'root'" },
+        "userId": { "type": "string", "description": "The ID of the user who owns this folder" }
+      },
+      "required": ["name", "parentId", "userId"]
+    },
+    "HtmlFile": {
+      "title": "HtmlFile",
+      "description": "An uploaded HTML file",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "The name of the file" },
+        "content": { "type": "string", "description": "The HTML content of the file" },
+        "folderId": { "type": "string", "description": "The ID of the folder where this file is located" },
+        "userId": { "type": "string", "description": "The ID of the user who owns this file" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the file was uploaded" }
+      },
+      "required": ["name", "content", "folderId", "userId", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/folders/{folderId}": {
+      "schema": "Folder",
+      "description": "Folders for organizing HTML files"
+    },
+    "/htmlFiles/{fileId}": {
+      "schema": "HtmlFile",
+      "description": "Uploaded HTML files"
+    }
+  }
+}

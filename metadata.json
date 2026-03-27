@@ -1,0 +1,5 @@
+{
+  "name": "HTML Classifier & Viewer",
+  "description": "A web application to upload, classify, and view HTML files with a customizable nested sidebar menu triggered by a keyboard shortcut.",
+  "requestFramePermissions": []
+}
