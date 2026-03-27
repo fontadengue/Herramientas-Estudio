@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   FolderIcon, 
   FileCodeIcon, 
@@ -33,7 +33,8 @@ import {
   deleteDoc, 
   doc, 
   orderBy,
-  getDocs
+  getDocs,
+  updateDoc
 } from 'firebase/firestore';
 import { 
   signInWithPopup, 
@@ -62,6 +63,18 @@ interface DocumentFile {
   userId: string;
   createdAt: string;
   type: 'html' | 'txt';
+}
+
+interface SidebarPanelProps {
+  folderId: string;
+  folders: Folder[];
+  files: DocumentFile[];
+  index: number;
+  navigationPath: string[];
+  setNavigationPath: (path: string[]) => void;
+  selectedFile: DocumentFile | null;
+  setSelectedFile: (file: DocumentFile | null) => void;
+  isEditMode: boolean;
 }
 
 // --- Components ---
@@ -318,7 +331,7 @@ export default function App() {
                     Estudio Dutto
                   </h1>
                   <p className="text-gray-500 text-sm font-medium">
-                    Gestión y Visualización de Documentos
+                    Gestión y Visualización de Herramientas
                   </p>
                 </div>
               </div>
@@ -407,7 +420,7 @@ export default function App() {
 
 // --- Sidebar Panel Component ---
 
-function SidebarPanel({ 
+const SidebarPanel: React.FC<SidebarPanelProps> = ({ 
   folderId, 
   folders, 
   files, 
@@ -417,26 +430,40 @@ function SidebarPanel({
   selectedFile,
   setSelectedFile,
   isEditMode
-}: { 
-  folderId: string, 
-  folders: Folder[], 
-  files: DocumentFile[], 
-  index: number,
-  navigationPath: string[],
-  setNavigationPath: (path: string[]) => void,
-  selectedFile: DocumentFile | null,
-  setSelectedFile: (file: DocumentFile) => void,
-  isEditMode: boolean
-}) {
+}) => {
   const currentFolders = folders.filter(f => f.parentId === folderId);
   const currentFiles = files.filter(f => f.folderId === folderId);
   const activeChildId = navigationPath[index + 1];
+
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState('');
 
   const handleFolderClick = (id: string) => {
     if (isEditMode) return;
     const newPath = navigationPath.slice(0, index + 1);
     newPath.push(id);
     setNavigationPath(newPath);
+  };
+
+  const handleStartEdit = (e: React.MouseEvent, id: string, currentName: string) => {
+    if (!isEditMode) return;
+    e.stopPropagation();
+    setEditingId(id);
+    setEditingName(currentName);
+  };
+
+  const handleSaveEdit = async (id: string, type: 'folder' | 'file') => {
+    if (!editingName.trim()) {
+      setEditingId(null);
+      return;
+    }
+    try {
+      const collectionName = type === 'folder' ? 'folders' : 'htmlFiles';
+      await updateDoc(doc(db, collectionName, id), { name: editingName });
+    } catch (error) {
+      console.error("Rename Error:", error);
+    }
+    setEditingId(null);
   };
 
   const handleDeleteFile = async (e: React.MouseEvent, fileId: string) => {
@@ -509,9 +536,26 @@ function SidebarPanel({
               isEditMode && "cursor-default"
             )}
           >
-            <div className="flex items-center gap-3 truncate">
+            <div className="flex items-center gap-3 truncate flex-1 min-w-0">
               <FolderIcon size={16} className={cn(activeChildId === folder.id ? "text-yellow-400" : "text-yellow-500/70")} />
-              <span className="truncate">{folder.name}</span>
+              {editingId === folder.id ? (
+                <input
+                  autoFocus
+                  className="bg-black/40 border border-yellow-500/50 rounded px-1 py-0.5 w-full text-xs text-white outline-none"
+                  value={editingName}
+                  onChange={(e) => setEditingName(e.target.value)}
+                  onBlur={() => handleSaveEdit(folder.id, 'folder')}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSaveEdit(folder.id, 'folder')}
+                  onClick={(e) => e.stopPropagation()}
+                />
+              ) : (
+                <span 
+                  className="truncate"
+                  onClick={(e) => handleStartEdit(e, folder.id, folder.name)}
+                >
+                  {folder.name}
+                </span>
+              )}
             </div>
             <div className="flex items-center gap-1">
               {isEditMode ? (
@@ -543,12 +587,31 @@ function SidebarPanel({
                 isEditMode && "cursor-default pr-10"
               )}
             >
-              {file.type === 'txt' ? (
-                <FileTextIcon size={16} className={cn(selectedFile?.id === file.id ? "text-white" : "text-blue-400")} />
-              ) : (
-                <FileCodeIcon size={16} className={cn(selectedFile?.id === file.id ? "text-white" : "text-blue-400")} />
-              )}
-              <span className="truncate font-semibold">{file.name}</span>
+              <div className="flex items-center gap-3 truncate flex-1 min-w-0">
+                {file.type === 'txt' ? (
+                  <FileTextIcon size={16} className={cn(selectedFile?.id === file.id ? "text-white" : "text-blue-400")} />
+                ) : (
+                  <FileCodeIcon size={16} className={cn(selectedFile?.id === file.id ? "text-white" : "text-blue-400")} />
+                )}
+                {editingId === file.id ? (
+                  <input
+                    autoFocus
+                    className="bg-black/40 border border-blue-400/50 rounded px-1 py-0.5 w-full text-xs text-white outline-none"
+                    value={editingName}
+                    onChange={(e) => setEditingName(e.target.value)}
+                    onBlur={() => handleSaveEdit(file.id, 'file')}
+                    onKeyDown={(e) => e.key === 'Enter' && handleSaveEdit(file.id, 'file')}
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                ) : (
+                  <span 
+                    className="truncate font-semibold"
+                    onClick={(e) => handleStartEdit(e, file.id, file.name)}
+                  >
+                    {file.name}
+                  </span>
+                )}
+              </div>
             </button>
             
             {isEditMode && (
