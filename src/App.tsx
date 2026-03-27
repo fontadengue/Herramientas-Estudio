@@ -47,6 +47,28 @@ import {
 import { auth, db } from './firebase';
 import { cn } from './lib/utils';
 
+const getShortcutUrl = (content: string) => {
+  if (!content) return null;
+  const trimmed = content.trim();
+  
+  // Case 1: Standard .url file format ([InternetShortcut] URL=...)
+  const urlMatch = trimmed.match(/URL\s*=\s*(https?:\/\/[^\s\r\n]+)/i);
+  if (urlMatch) return urlMatch[1];
+  
+  // Case 2: Just a URL in the file
+  if (trimmed.match(/^https?:\/\/[^\s\r\n]+$/i)) {
+    return trimmed;
+  }
+
+  // Case 3: HTML redirect (<meta http-equiv="refresh" content="0; url=...">)
+  const metaMatch = trimmed.match(/url\s*=\s*(https?:\/\/[^\s"'>]+)/i);
+  if (metaMatch && trimmed.toLowerCase().includes('http-equiv="refresh"')) {
+    return metaMatch[1];
+  }
+  
+  return null;
+};
+
 // --- Types ---
 
 interface Folder {
@@ -92,28 +114,6 @@ export default function App() {
   const [showTutorial, setShowTutorial] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isEditMode, setIsEditMode] = useState(false);
-
-  const getShortcutUrl = (content: string) => {
-    if (!content) return null;
-    const trimmed = content.trim();
-    
-    // Case 1: Standard .url file format ([InternetShortcut] URL=...)
-    const urlMatch = trimmed.match(/URL\s*=\s*(https?:\/\/[^\s\r\n]+)/i);
-    if (urlMatch) return urlMatch[1];
-    
-    // Case 2: Just a URL in the file
-    if (trimmed.match(/^https?:\/\/[^\s\r\n]+$/i)) {
-      return trimmed;
-    }
-
-    // Case 3: HTML redirect (<meta http-equiv="refresh" content="0; url=...">)
-    const metaMatch = trimmed.match(/url\s*=\s*(https?:\/\/[^\s"'>]+)/i);
-    if (metaMatch && trimmed.toLowerCase().includes('http-equiv="refresh"')) {
-      return metaMatch[1];
-    }
-    
-    return null;
-  };
 
   const shortcutUrl = selectedFile ? getShortcutUrl(selectedFile.content) : null;
 
@@ -633,7 +633,15 @@ const SidebarPanel: React.FC<SidebarPanelProps> = ({
             className="group relative"
           >
             <button 
-              onClick={() => !isEditMode && setSelectedFile(file)}
+              onClick={() => {
+                if (!isEditMode) {
+                  const url = getShortcutUrl(file.content);
+                  if (url) {
+                    window.open(url, '_blank');
+                  }
+                  setSelectedFile(file);
+                }
+              }}
               className={cn(
                 "w-full flex items-center gap-3 py-2 px-3 rounded-xl transition-all text-sm group border",
                 selectedFile?.id === file.id 
