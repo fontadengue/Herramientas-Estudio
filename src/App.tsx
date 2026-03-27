@@ -21,7 +21,8 @@ import {
   MenuIcon,
   HomeIcon,
   DownloadIcon,
-  FileTextIcon
+  FileTextIcon,
+  ExternalLinkIcon
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -91,6 +92,30 @@ export default function App() {
   const [showTutorial, setShowTutorial] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isEditMode, setIsEditMode] = useState(false);
+
+  const getShortcutUrl = (content: string) => {
+    if (!content) return null;
+    const trimmed = content.trim();
+    
+    // Case 1: Standard .url file format ([InternetShortcut] URL=...)
+    const urlMatch = trimmed.match(/URL\s*=\s*(https?:\/\/[^\s\r\n]+)/i);
+    if (urlMatch) return urlMatch[1];
+    
+    // Case 2: Just a URL in the file
+    if (trimmed.match(/^https?:\/\/[^\s\r\n]+$/i)) {
+      return trimmed;
+    }
+
+    // Case 3: HTML redirect (<meta http-equiv="refresh" content="0; url=...">)
+    const metaMatch = trimmed.match(/url\s*=\s*(https?:\/\/[^\s"'>]+)/i);
+    if (metaMatch && trimmed.toLowerCase().includes('http-equiv="refresh"')) {
+      return metaMatch[1];
+    }
+    
+    return null;
+  };
+
+  const shortcutUrl = selectedFile ? getShortcutUrl(selectedFile.content) : null;
 
   // --- Data Fetching ---
 
@@ -287,7 +312,37 @@ export default function App() {
               </button>
             </header>
             <div className="flex-1 bg-white overflow-hidden">
-              {selectedFile.type === 'txt' ? (
+              {shortcutUrl ? (
+                <div className="w-full h-full flex flex-col items-center justify-center bg-gray-50 p-8 text-center">
+                  <motion.div 
+                    initial={{ scale: 0.9, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    className="max-w-md w-full p-10 bg-white rounded-[40px] shadow-2xl border border-gray-100 flex flex-col items-center gap-8"
+                  >
+                    <div className="w-20 h-20 rounded-3xl bg-blue-500/10 flex items-center justify-center text-blue-600">
+                      <ExternalLinkIcon size={40} />
+                    </div>
+                    <div className="space-y-3">
+                      <h3 className="text-2xl font-bold text-gray-900 tracking-tight">Acceso Directo</h3>
+                      <p className="text-sm text-gray-500 leading-relaxed">
+                        Este archivo contiene un enlace a una herramienta externa.
+                      </p>
+                    </div>
+                    <a 
+                      href={shortcutUrl} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="w-full py-5 px-8 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-bold transition-all shadow-xl shadow-blue-600/20 flex items-center justify-center gap-3 group"
+                    >
+                      <span>Abrir Herramienta</span>
+                      <ExternalLinkIcon size={20} className="group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                    </a>
+                    <div className="pt-4 border-t border-gray-100 w-full">
+                      <p className="text-[10px] text-gray-400 font-mono break-all opacity-60">{shortcutUrl}</p>
+                    </div>
+                  </motion.div>
+                </div>
+              ) : selectedFile.type === 'txt' ? (
                 <div className="w-full h-full p-8 overflow-auto bg-[#f8f9fa] text-gray-800 font-mono text-sm leading-relaxed whitespace-pre-wrap">
                   {selectedFile.content}
                 </div>
@@ -730,9 +785,9 @@ function UploadModal({ onClose, folders }: { onClose: () => void, folders: Folde
                   <p className="mb-2 text-sm text-gray-400">
                     <span className="font-semibold">Haz clic para subir</span> o arrastra y suelta
                   </p>
-                  <p className="text-xs text-gray-500">Archivos .html o .txt</p>
+                  <p className="text-xs text-gray-500">Archivos .html, .txt o .url</p>
                 </div>
-                <input type="file" className="hidden" accept=".html,.txt" onChange={handleFileChange} />
+                <input type="file" className="hidden" accept=".html,.txt,.url" onChange={handleFileChange} />
               </label>
             </div>
           ) : (
