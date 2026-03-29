@@ -237,7 +237,7 @@ export default function App() {
           setSearchQuery('');
           setNavigationPath(['root']);
         }}
-        className="fixed top-14 right-4 z-50 flex items-center justify-center w-11 h-11 rounded-full bg-white/10 backdrop-blur-md border border-white/10 hover:bg-white/20 transition-all shadow-xl text-white"
+        className="fixed top-4 right-4 z-50 flex items-center justify-center w-11 h-11 rounded-full bg-white/10 backdrop-blur-md border border-white/10 hover:bg-white/20 transition-all shadow-xl text-white"
         title="Ir al Inicio"
       >
         <HomeIcon size={20} />
@@ -322,7 +322,7 @@ export default function App() {
                   document.body.removeChild(a);
                   URL.revokeObjectURL(url);
                 }}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 transition-all text-xs font-medium"
+                className="flex items-center gap-2 px-3 py-1.5 mr-20 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 transition-all text-xs font-medium"
               >
                 <DownloadIcon size={14} />
                 <span>Descargar</span>
