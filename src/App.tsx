@@ -237,7 +237,7 @@ export default function App() {
           setSearchQuery('');
           setNavigationPath(['root']);
         }}
-        className="fixed top-4 right-4 z-50 flex items-center justify-center w-11 h-11 rounded-full bg-white/10 backdrop-blur-md border border-white/10 hover:bg-white/20 transition-all shadow-xl text-white"
+        className="fixed top-2 right-4 z-50 flex items-center justify-center w-11 h-11 rounded-full bg-white/10 backdrop-blur-md border border-white/10 hover:bg-white/20 transition-all shadow-xl text-white"
         title="Ir al Inicio"
       >
         <HomeIcon size={20} />
