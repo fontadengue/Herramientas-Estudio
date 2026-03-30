@@ -116,6 +116,7 @@ export default function App() {
   const [showTutorial, setShowTutorial] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isEditMode, setIsEditMode] = useState(false);
+  const [showMenuArrow, setShowMenuArrow] = useState(true);
 
   const shortcutUrl = selectedFile ? getShortcutUrl(selectedFile.content) : null;
 
@@ -143,9 +144,14 @@ export default function App() {
       setFiles(fileData);
     });
 
+    const arrowTimer = setTimeout(() => {
+      setShowMenuArrow(false);
+    }, 3000);
+
     return () => {
       unsubscribeFolders();
       unsubscribeFiles();
+      clearTimeout(arrowTimer);
     };
   }, []);
 
@@ -207,6 +213,33 @@ export default function App() {
           {isSidebarOpen ? <XIcon size={20} /> : <MenuIcon size={20} />}
           <span className="text-sm font-medium">{isSidebarOpen ? 'Cerrar' : 'Menu'}</span>
         </motion.button>
+
+        {/* Floating Arrow Indicator */}
+        <AnimatePresence>
+          {showMenuArrow && !isSidebarOpen && (
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ 
+                opacity: 1, 
+                x: [0, -10, 0],
+              }}
+              exit={{ opacity: 0, scale: 0.5 }}
+              transition={{ 
+                x: { repeat: Infinity, duration: 1, ease: "easeInOut" },
+                opacity: { duration: 0.3 }
+              }}
+              className="absolute left-32 top-1/2 -translate-y-1/2 flex items-center gap-2 pointer-events-none"
+            >
+              <div className="flex items-center">
+                <div className="w-8 h-1 bg-blue-500 rounded-full shadow-[0_0_15px_rgba(59,130,246,0.5)]" />
+                <div className="w-3 h-3 border-t-4 border-l-4 border-blue-500 -rotate-45 -ml-1 shadow-[-2px_-2px_10px_rgba(59,130,246,0.3)]" />
+              </div>
+              <span className="text-xs font-bold text-blue-400 uppercase tracking-widest whitespace-nowrap drop-shadow-lg">
+                Click aquí
+              </span>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Tutorial Message */}
         <AnimatePresence>
