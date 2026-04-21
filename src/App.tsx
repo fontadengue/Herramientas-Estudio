@@ -88,6 +88,8 @@ interface DocumentFile {
   userId: string;
   createdAt: string;
   type: 'html' | 'txt' | 'xlsx';
+  script?: string;
+  styles?: string;
 }
 
 interface SidebarPanelProps {
@@ -400,7 +402,24 @@ export default function App() {
                 </div>
               ) : (
                 <iframe 
-                  srcDoc={selectedFile.content}
+                  srcDoc={(() => {
+                    let fullContent = selectedFile.content;
+                    if (selectedFile.styles) {
+                      if (fullContent.includes('</head>')) {
+                        fullContent = fullContent.replace('</head>', `<style>${selectedFile.styles}</style></head>`);
+                      } else {
+                        fullContent = `<style>${selectedFile.styles}</style>` + fullContent;
+                      }
+                    }
+                    if (selectedFile.script) {
+                      if (fullContent.includes('</body>')) {
+                        fullContent = fullContent.replace('</body>', `<script>${selectedFile.script}</script></body>`);
+                      } else {
+                        fullContent = fullContent + `<script>${selectedFile.script}</script>`;
+                      }
+                    }
+                    return fullContent;
+                  })()}
                   className="w-full h-full border-none"
                   title={selectedFile.name}
                 />
@@ -811,7 +830,13 @@ const SidebarPanel: React.FC<SidebarPanelProps> = ({
 
 function UploadModal({ onClose, folders }: { onClose: () => void, folders: Folder[] }) {
   const [step, setStep] = useState<'upload' | 'classify'>('upload');
-  const [file, setFile] = useState<{ name: string, content: string, type: 'html' | 'txt' | 'xlsx' } | null>(null);
+  const [file, setFile] = useState<{ 
+    name: string, 
+    content: string, 
+    type: 'html' | 'txt' | 'xlsx',
+    script?: string,
+    styles?: string 
+  } | null>(null);
   const [path, setPath] = useState<string>(''); // e.g. "Bancos/Macro"
   const [isUploading, setIsUploading] = useState(false);
 
@@ -828,7 +853,9 @@ function UploadModal({ onClose, folders }: { onClose: () => void, folders: Folde
       setFile({
         name: selectedFile.name,
         content: event.target?.result as string,
-        type: fileType
+        type: fileType,
+        script: '',
+        styles: ''
       });
       setStep('classify');
     };
@@ -838,6 +865,20 @@ function UploadModal({ onClose, folders }: { onClose: () => void, folders: Folde
     } else {
       reader.readAsText(selectedFile);
     }
+  };
+
+  const handleOptionalFile = (e: React.ChangeEvent<HTMLInputElement>, type: 'script' | 'styles') => {
+    const optFile = e.target.files?.[0];
+    if (!optFile || !file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setFile({
+        ...file,
+        [type]: event.target?.result as string
+      });
+    };
+    reader.readAsText(optFile);
   };
 
   const handleUpload = async () => {
@@ -873,7 +914,9 @@ function UploadModal({ onClose, folders }: { onClose: () => void, folders: Folde
         type: file.type,
         folderId: currentParentId,
         userId: 'public',
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        script: file.script || '',
+        styles: file.styles || ''
       });
 
       onClose();
@@ -955,6 +998,28 @@ function UploadModal({ onClose, folders }: { onClose: () => void, folders: Folde
                   Usa "/" para crear subcarpetas. Si no existen, se crearán automáticamente.
                 </p>
               </div>
+
+              {/* Optional Files for HTML */}
+              {file?.type === 'html' && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Script (JS - Opcional)</label>
+                    <label className="flex items-center gap-2 p-2 bg-white/5 border border-white/10 rounded-xl cursor-pointer hover:bg-white/10 transition-all">
+                      <FilePlusIcon size={14} className="text-blue-400" />
+                      <span className="text-[10px] truncate">{file.script ? 'Cargado' : 'Subir JS'}</span>
+                      <input type="file" className="hidden" accept=".js" onChange={(e) => handleOptionalFile(e, 'script')} />
+                    </label>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Estilos (CSS - Opcional)</label>
+                    <label className="flex items-center gap-2 p-2 bg-white/5 border border-white/10 rounded-xl cursor-pointer hover:bg-white/10 transition-all">
+                      <FilePlusIcon size={14} className="text-blue-400" />
+                      <span className="text-[10px] truncate">{file.styles ? 'Cargado' : 'Subir CSS'}</span>
+                      <input type="file" className="hidden" accept=".css" onChange={(e) => handleOptionalFile(e, 'styles')} />
+                    </label>
+                  </div>
+                </div>
+              )}
 
               <div className="flex gap-3 pt-4">
                 <button 
